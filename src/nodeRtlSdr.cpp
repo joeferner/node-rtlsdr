@@ -63,10 +63,13 @@ v8::Handle<v8::Value> GetDevices(const v8::Arguments& args) {
   deviceArray = v8::Array::New();
   deviceCount = rtlsdr_get_device_count();
   for(i = 0; i < deviceCount; i++) {
+    vendor[0] = '\0';
+    product[0] = '\0';
+    serial[0] = '\0';
     err = rtlsdr_get_device_usb_strings(i, vendor, product, serial);
     if(err) {
       sprintf(str, "Could not get device strings");
-      callbackArgs[0] = v8::Exception::TypeError(v8::String::New(str));
+      callbackArgs[0] = v8::Exception::Error(v8::String::New(str));
       goto getDevicesDone;
     }
     deviceName = rtlsdr_get_device_name(i);
@@ -77,6 +80,10 @@ v8::Handle<v8::Value> GetDevices(const v8::Arguments& args) {
     device->Set(v8::String::New("name"), v8::String::New(deviceName));
     device->Set(v8::String::New("index"), v8::Int32::New(i));
     device->Set(v8::String::New("open"), v8::FunctionTemplate::New(device_open)->GetFunction());
+    device->Set(v8::String::New("setSampleRate"), v8::FunctionTemplate::New(device_setSampleRate)->GetFunction());
+    device->Set(v8::String::New("setCenterFrequency"), v8::FunctionTemplate::New(device_setCenterFrequency)->GetFunction());
+    device->Set(v8::String::New("start"), v8::FunctionTemplate::New(device_start)->GetFunction());
+    device->Set(v8::String::New("stop"), v8::FunctionTemplate::New(device_stop)->GetFunction());
     deviceArray->Set(i, device);
   }
 
@@ -102,7 +109,7 @@ v8::Handle<v8::Value> device_open(const v8::Arguments& args) {
 
   // callback
   if(!args[0]->IsFunction()) {
-    return scope.Close(v8::ThrowException(v8::Exception::TypeError(v8::String::New("First argument must be a function"))));
+    return scope.Close(v8::ThrowException(v8::Exception::Error(v8::String::New("First argument must be a function"))));
   }
   v8::Local<v8::Value> callback = args[0];
 
@@ -110,7 +117,7 @@ v8::Handle<v8::Value> device_open(const v8::Arguments& args) {
   err = rtlsdr_open(&dev, deviceIdx);
   if(err < 0) {
     sprintf(str, "Could not open device err:%d.", err);
-    callbackArgs[0] = v8::Exception::TypeError(v8::String::New(str));
+    callbackArgs[0] = v8::Exception::Error(v8::String::New(str));
     goto deviceOpenDone;
   }
 
@@ -121,10 +128,7 @@ v8::Handle<v8::Value> device_open(const v8::Arguments& args) {
   deviceData->v8dev.MakeWeak(deviceData, device_cleanUp);
   deviceData->v8dev.MarkIndependent();
 
-  device->Set(v8::String::New("setSampleRate"), v8::FunctionTemplate::New(device_setSampleRate)->GetFunction());
-  device->Set(v8::String::New("setCenterFrequency"), v8::FunctionTemplate::New(device_setCenterFrequency)->GetFunction());
-  device->Set(v8::String::New("start"), v8::FunctionTemplate::New(device_start)->GetFunction());
-  device->Set(v8::String::New("stop"), v8::FunctionTemplate::New(device_stop)->GetFunction());
+  callbackArgs[1] = deviceData->v8dev;
 
 deviceOpenDone:
   v8::Function::Cast(*callback)->Call(v8::Context::GetCurrent()->Global(), 2, callbackArgs);
@@ -142,7 +146,7 @@ v8::Handle<v8::Value> device_setSampleRate(const v8::Arguments& args) {
   int err = rtlsdr_set_sample_rate(data->dev, sampleRate);
   if(err < 0) {
     sprintf(str, "failed to set sample rate (err: %d)", err);
-    return scope.Close(v8::ThrowException(v8::Exception::TypeError(v8::String::New(str))));
+    return scope.Close(v8::ThrowException(v8::Exception::Error(v8::String::New(str))));
   }
 
   return scope.Close(v8::Undefined());
@@ -159,7 +163,7 @@ v8::Handle<v8::Value> device_setCenterFrequency(const v8::Arguments& args) {
   int err = rtlsdr_set_center_freq(data->dev, frequency);
   if(err < 0) {
     sprintf(str, "failed to set frequency (err: %d)", err);
-    return scope.Close(v8::ThrowException(v8::Exception::TypeError(v8::String::New(str))));
+    return scope.Close(v8::ThrowException(v8::Exception::Error(v8::String::New(str))));
   }
 
   return scope.Close(v8::Undefined());
@@ -174,13 +178,13 @@ v8::Handle<v8::Value> device_start(const v8::Arguments& args) {
   int err = rtlsdr_reset_buffer(data->dev);
   if(err < 0) {
     sprintf(str, "failed to reset buffer (err: %d)", err);
-    return scope.Close(v8::ThrowException(v8::Exception::TypeError(v8::String::New(str))));
+    return scope.Close(v8::ThrowException(v8::Exception::Error(v8::String::New(str))));
   }
 
   err = rtlsdr_read_async(data->dev, device_dataCallback, (void*)data, DEFAULT_ASYNC_BUF_NUMBER, DEFAULT_BUF_LENGTH);
   if(err < 0) {
     sprintf(str, "failed to start read async (err: %d)", err);
-    return scope.Close(v8::ThrowException(v8::Exception::TypeError(v8::String::New(str))));
+    return scope.Close(v8::ThrowException(v8::Exception::Error(v8::String::New(str))));
   }
 
   return scope.Close(v8::Undefined());
