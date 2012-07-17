@@ -21,6 +21,17 @@ struct DeviceData {
   v8::Persistent<v8::Object> v8dev;
 };
 
+struct DataEventData {
+  DeviceData* devData;
+  unsigned char* buf;
+  int len;
+};
+
+struct StartData {
+  DeviceData* devData;
+  v8::Persistent<v8::Value> callback;
+};
+
 v8::Handle<v8::Value> GetDevices(const v8::Arguments& args) {
   v8::HandleScope scope;
   int deviceCount, i;
@@ -169,23 +180,59 @@ v8::Handle<v8::Value> device_setCenterFrequency(const v8::Arguments& args) {
   return scope.Close(v8::Undefined());
 }
 
+void EIO_Start(uv_work_t* req) {
+  StartData* startData = (StartData*)req->data;
+
+printf("starting\n");
+  int err = rtlsdr_read_async(startData->devData->dev, device_dataCallback, (void*)startData->devData, DEFAULT_ASYNC_BUF_NUMBER, DEFAULT_BUF_LENGTH);
+  if(err) {
+    char str[1000];
+    sprintf(str, "failed to start read async (err: %d)", err);
+    printf("error starting: %s", str);
+    // TODO callback with error
+    return;
+  }
+
+  printf("started");
+}
+
+void EIO_StartAfter(uv_work_t* req) {
+  v8::HandleScope scope;
+  StartData* startData = (StartData*)req->data;
+
+  // TODO startData->callback.Dispose();
+  delete startData;
+  printf("started2");
+}
+
 v8::Handle<v8::Value> device_start(const v8::Arguments& args) {
   v8::HandleScope scope;
   char str[1000];
   v8::Local<v8::Object> device = args.This();
   DeviceData* data = (DeviceData*)device->GetPointerFromInternalField(0);
+  StartData* startData;
+
+  // callback
+  /* TODO
+  if(!args[0]->IsFunction()) {
+    return scope.Close(v8::ThrowException(v8::Exception::TypeError(v8::String::New("First argument must be a function"))));
+  }
+  v8::Local<v8::Value> callback = args[0];
+  */
 
   int err = rtlsdr_reset_buffer(data->dev);
-  if(err < 0) {
+  if(err) {
     sprintf(str, "failed to reset buffer (err: %d)", err);
     return scope.Close(v8::ThrowException(v8::Exception::Error(v8::String::New(str))));
   }
 
-  err = rtlsdr_read_async(data->dev, device_dataCallback, (void*)data, DEFAULT_ASYNC_BUF_NUMBER, DEFAULT_BUF_LENGTH);
-  if(err < 0) {
-    sprintf(str, "failed to start read async (err: %d)", err);
-    return scope.Close(v8::ThrowException(v8::Exception::Error(v8::String::New(str))));
-  }
+  startData = new StartData();
+  startData->devData = data;
+  // TODO startData->callback = v8::Persistent<v8::Value>::New(callback);
+
+  uv_work_t* req = new uv_work_t();
+  req->data = startData;
+  uv_queue_work(uv_default_loop(), req, EIO_Start, EIO_StartAfter);
 
   return scope.Close(v8::Undefined());
 }
@@ -200,13 +247,33 @@ v8::Handle<v8::Value> device_stop(const v8::Arguments& args) {
   return scope.Close(v8::Undefined());
 }
 
-static void device_dataCallback(unsigned char* buf, uint32_t len, void *ctx) {
-  DeviceData* data = (DeviceData*)ctx;
+void EIO_EmitData(uv_work_t* req) {
+
+}
+
+void EIO_EmitDataAfter(uv_work_t* req) {
+  v8::HandleScope scope;
+  DataEventData* eventData = (DataEventData*)req->data;
 
   v8::Handle<v8::Value> emitArgs[2];
   emitArgs[0] = v8::String::New("data");
-  emitArgs[1] = v8::Local<v8::Object>::New(node::Buffer::New((char*)buf, len)->handle_);
-  v8::Function::Cast(*data->v8dev->Get(v8::String::New("emit")))->Call(data->v8dev, 2, emitArgs);
+  emitArgs[1] = v8::Local<v8::Object>::New(node::Buffer::New((char*)eventData->buf, eventData->len)->handle_);
+  v8::Function::Cast(*eventData->devData->v8dev->Get(v8::String::New("emit")))->Call(eventData->devData->v8dev, 2, emitArgs);
+
+  delete eventData;
+}
+
+static void device_dataCallback(unsigned char* buf, uint32_t len, void *ctx) {
+printf("data %d\n", len);
+  DeviceData* devData = (DeviceData*)ctx;
+  DataEventData* eventData = new DataEventData();
+  eventData->devData = devData;
+  eventData->buf = buf;
+  eventData->len = len;
+
+  uv_work_t* req = new uv_work_t();
+  req->data = eventData;
+  uv_queue_work(uv_default_loop(), req, EIO_EmitData, EIO_EmitDataAfter);
 }
 
 void device_cleanUp(v8::Persistent<v8::Value> obj, void *parameter) {
