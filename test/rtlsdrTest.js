@@ -18,14 +18,16 @@ module.exports = {
           }
           device.setSampleRate(2048000);
           device.setCenterFrequency(99500000);
+          var dataCount = 0;
           device.on("data", function (data) {
-            console.log(data);
+            dataCount++;
           });
           device.start();
           setTimeout(function () {
+            test.ok(dataCount > 0, "no data reveived");
             device.stop();
             test.done();
-          }, 10000);
+          }, 1000);
         });
       }
     );

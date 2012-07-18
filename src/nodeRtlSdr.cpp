@@ -183,7 +183,6 @@ v8::Handle<v8::Value> device_setCenterFrequency(const v8::Arguments& args) {
 void EIO_Start(uv_work_t* req) {
   StartData* startData = (StartData*)req->data;
 
-printf("starting\n");
   int err = rtlsdr_read_async(startData->devData->dev, device_dataCallback, (void*)startData->devData, DEFAULT_ASYNC_BUF_NUMBER, DEFAULT_BUF_LENGTH);
   if(err) {
     char str[1000];
@@ -192,8 +191,6 @@ printf("starting\n");
     // TODO callback with error
     return;
   }
-
-  printf("started");
 }
 
 void EIO_StartAfter(uv_work_t* req) {
@@ -202,7 +199,6 @@ void EIO_StartAfter(uv_work_t* req) {
 
   // TODO startData->callback.Dispose();
   delete startData;
-  printf("started2");
 }
 
 v8::Handle<v8::Value> device_start(const v8::Arguments& args) {
@@ -264,7 +260,6 @@ void EIO_EmitDataAfter(uv_work_t* req) {
 }
 
 static void device_dataCallback(unsigned char* buf, uint32_t len, void *ctx) {
-printf("data %d\n", len);
   DeviceData* devData = (DeviceData*)ctx;
   DataEventData* eventData = new DataEventData();
   eventData->devData = devData;
