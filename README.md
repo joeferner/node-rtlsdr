@@ -3,7 +3,8 @@
 
 Node wrapper around [rtl-sdr](http://sdr.osmocom.org/trac/wiki/rtl-sdr/)
 
-Note: this is a working fork of the [node-rtlsdr](https://github.com/joeferner/node-rtlsdr) module
+Note: this is a working fork of the [node-rtlsdr](https://github.com/joeferner/node-rtlsdr) module.
+
 You must install rtl-sdr libs first:
 
 ```
