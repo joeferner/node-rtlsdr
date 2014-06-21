@@ -228,7 +228,7 @@ v8::Handle<v8::Value> device_start(const v8::Arguments& args) {
 
   uv_work_t* req = new uv_work_t();
   req->data = startData;
-  uv_queue_work(uv_default_loop(), req, EIO_Start, EIO_StartAfter);
+  uv_queue_work(uv_default_loop(), req, EIO_Start, (uv_after_work_cb) EIO_StartAfter);
 
   return scope.Close(v8::Undefined());
 }
@@ -268,7 +268,7 @@ static void device_dataCallback(unsigned char* buf, uint32_t len, void *ctx) {
 
   uv_work_t* req = new uv_work_t();
   req->data = eventData;
-  uv_queue_work(uv_default_loop(), req, EIO_EmitData, EIO_EmitDataAfter);
+  uv_queue_work(uv_default_loop(), req, EIO_EmitData, (uv_after_work_cb) EIO_EmitDataAfter);
 }
 
 void device_cleanUp(v8::Persistent<v8::Value> obj, void *parameter) {
