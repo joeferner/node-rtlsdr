@@ -9,4 +9,4 @@ extern "C" {
   }
 }
 
-NODE_MODULE(rtlsdr, init);
+NODE_MODULE(nodeRtlsdr, init);
