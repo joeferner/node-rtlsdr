@@ -1,5 +1,5 @@
 
-# rtlsdr
+# node-rtlsdr
 
 Node wrapper around [rtl-sdr](http://sdr.osmocom.org/trac/wiki/rtl-sdr/)
 
